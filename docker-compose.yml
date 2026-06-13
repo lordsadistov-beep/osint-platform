@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: osint_platform
+      POSTGRES_USER: osint
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-supersecret123}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://osint:${DB_PASSWORD:-supersecret123}@postgres:5432/osint_platform
+      REDIS_URL: redis://redis:6379
+      SECRET_KEY: ${SECRET_KEY:-change-this-secret-key-at-least-32-chars}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      FRONTEND_URL: http://localhost:3000
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  celery_worker:
+    build: ./backend
+    command: celery -A app.workers.search_tasks worker --loglevel=info
+    depends_on:
+      - redis
+      - backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://osint:${DB_PASSWORD:-supersecret123}@postgres:5432/osint_platform
+      REDIS_URL: redis://redis:6379
+      SECRET_KEY: ${SECRET_KEY:-change-this-secret-key-at-least-32-chars}
+    restart: unless-stopped
+
+volumes:
+  pgdata:
