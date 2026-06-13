@@ -33,7 +33,7 @@ async def list_lessons(
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar()
     result = await db.execute(query.offset((page - 1) * limit).limit(limit))
     items = result.scalars().all()
-    return {"items": [LessonResponse.model_validate(l) for l in items], "total": total, "page": page, "limit": limit}
+    return {"items": [LessonResponse.from_orm(l) for l in items], "total": total, "page": page, "limit": limit}
 
 
 @router.get("/categories")
@@ -62,7 +62,7 @@ async def get_practice(slug: str, user: User = Depends(get_current_user), db: As
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
     example_data = f"example_{lesson.tool_slug}_data" if lesson.tool_slug else ""
-    return PracticeResponse(lesson=LessonResponse.model_validate(lesson), example_data=example_data)
+    return PracticeResponse(lesson=LessonResponse.from_orm(lesson), example_data=example_data)
 
 
 @router.post("/{slug}/complete", response_model=CompleteLessonResponse)
@@ -111,5 +111,5 @@ async def get_related(id: str, db: AsyncSession = Depends(get_db)):
     return RelatedResponse(
         tool=tool,
         challenges=challenges,
-        next_lesson=LessonResponse.model_validate(next_lesson) if next_lesson else None,
+        next_lesson=LessonResponse.from_orm(next_lesson) if next_lesson else None,
     )

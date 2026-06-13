@@ -18,7 +18,7 @@ router = APIRouter()
 @router.get("")
 async def list_challenges(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Challenge).where(Challenge.is_active == True))
-    return {"items": [ChallengeResponse.model_validate(c) for c in result.scalars().all()]}
+    return {"items": [ChallengeResponse.from_orm(c) for c in result.scalars().all()]}
 
 
 @router.get("/{id}", response_model=ChallengeDetailResponse)
@@ -35,7 +35,7 @@ async def get_challenge(id: str, user: User = Depends(get_current_user), db: Asy
         )
     )
     solved = sub_result.scalar_one_or_none()
-    detail = ChallengeDetailResponse.model_validate(challenge)
+    detail = ChallengeDetailResponse.from_orm(challenge)
     if not solved:
         detail.hint = None
     return detail

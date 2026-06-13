@@ -46,7 +46,7 @@ async def get_history(
     query = select(SearchHistory).where(SearchHistory.user_id == user.id).order_by(desc(SearchHistory.created_at))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar()
     result = await db.execute(query.offset((page - 1) * limit).limit(limit))
-    items = [HistoryItem.model_validate(h) for h in result.scalars().all()]
+    items = [HistoryItem.from_orm(h) for h in result.scalars().all()]
     return PaginatedHistory(items=items, total=total, page=page, limit=limit)
 
 
@@ -90,7 +90,7 @@ async def save_connection(req: SaveConnectionRequest, user: User = Depends(get_c
     )
     db.add(conn)
     await db.flush()
-    return ConnectionResponse.model_validate(conn)
+    return ConnectionResponse.from_orm(conn)
 
 
 @router.delete("/graph/{id}")
