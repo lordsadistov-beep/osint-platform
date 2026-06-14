@@ -8,42 +8,32 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger deploy and check
+      - name: Get service details
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
-          CT="Content-Type: application/json"
           BASE="https://api.render.com/v1"
           SVC_ID="srv-d8mtljrbc2fs73ecqcug"
-          PG_ID="dpg-d8nf51nlk1mc739m3g90-a"
 
-          CONN_INFO=$(curl -s -H "$AUTH" "$BASE/postgres/$PG_ID/connection-info")
-          PG_PASS=$(echo "$CONN_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin)['password'])")
-          DATABASE_URL="postgresql+asyncpg://osint_platform_y27c_user:${PG_PASS}@dpg-d8nf51nlk1mc739m3g90-a:5432/osint_platform_y27c"
-
-          curl -s -X PATCH -H "$AUTH" -H "$CT" \
-            -d "{\"envVars\":[{\"key\":\"DATABASE_URL\",\"value\":\"${DATABASE_URL}\"},{\"key\":\"FRONTEND_URL\",\"value\":\"https://osint-platform-frontend.onrender.com\"},{\"key\":\"CORS_ORIGINS\",\"value\":\"[\\\"https://osint-platform-frontend.onrender.com\\\"]\"}]}" \
-            "$BASE/services/$SVC_ID"
-
-          DEPLOY=$(curl -s -X POST -H "$AUTH" -H "$CT" \
-            -d '{"clearCache":"do_not_clear"}' \
-            "$BASE/services/$SVC_ID/deploys")
-          DEP_ID=$(echo "$DEPLOY" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
-          echo "Deploy ID: $DEP_ID"
-
-          echo "Waiting 5 min..."
-          sleep 300
-
-          echo "=== Deploy status ==="
-          curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys/$DEP_ID" | python3 -c "
+          echo "=== Full service details ==="
+          curl -s -H "$AUTH" "$BASE/services/$SVC_ID" | python3 -c "
           import sys, json
           d = json.load(sys.stdin)
-          print('Status:', d.get('status'))
-          print('Finished:', d.get('finishedAt','N/A'))
+          sd = d.get('serviceDetails', {})
+          print('name:', d.get('name'))
+          print('env:', sd.get('env'))
+          print('runtime:', sd.get('runtime'))
+          esd = sd.get('envSpecificDetails', {})
+          for k,v in esd.items():
+              print(f'  {k}: {v}')
           "
 
-          echo "=== Backend ==="
-          curl -s --max-time 10 "https://osint-platform-w0n6.onrender.com/health" || echo "(unreachable)"
           echo ""
-          echo "=== Frontend ==="
-          curl -s --max-time 10 "https://osint-platform-frontend.onrender.com" || echo "(unreachable)"
+          echo "=== Check latest deploys ==="
+          curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys?limit=3" | python3 -c "
+          import sys, json
+          deploys = json.load(sys.stdin)
+          for d in deploys:
+              c = d.get('commit',{})
+              print(f\"{d['id']}: status={d.get('status')} trigger={d.get('trigger')} msg='{c.get('message','')}' finished={d.get('finishedAt','N/A')}\")
+          "
