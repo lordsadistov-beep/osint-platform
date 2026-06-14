@@ -23,21 +23,18 @@ def api(method, path, data=None):
 
 # Get owners
 status, owners = api("GET", "/owners")
-owner_id = None
 if isinstance(owners, list) and owners:
     entry = owners[0]
-    if "owner" in entry:
-        owner_id = entry["owner"]["id"]
+    owner_id = entry.get("owner", entry).get("id") if "owner" in entry else entry.get("id")
 else:
     owner_id = owners.get("id") if isinstance(owners, dict) else None
 print(f"ownerId: {owner_id}")
 
-# Try 1: runtime as top-level field
-payload1 = {
+# Try WITHOUT runtime/env field - maybe serviceDetails is enough
+payload = {
     "type": "web_service",
     "name": "osint-platform-api",
     "ownerId": owner_id,
-    "runtime": "python",
     "plan": "free",
     "region": "oregon",
     "repo": "https://github.com/lordsadistov-beep/osint-platform",
@@ -45,6 +42,7 @@ payload1 = {
     "branch": "master",
     "rootDir": "backend",
     "serviceDetails": {
+        "env": "python",
         "healthCheckPath": "/health",
         "envSpecificDetails": {
             "buildCommand": "pip install -r requirements.txt",
@@ -52,18 +50,59 @@ payload1 = {
         }
     }
 }
-status, result = api("POST", "/services", payload1)
-print(f"Try 1 (runtime top-level) HTTP {status}: {json.dumps(result, indent=2)}")
+status, result = api("POST", "/services", payload)
+print(f"Try 1 (env in serviceDetails) HTTP {status}: {json.dumps(result, indent=2)}")
+if status == 201:
+    print(f"SUCCESS! New service ID: {result.get('id')}")
+    raise SystemExit(0)
+
+# Try with env AND runtime both as top-level
+payload2 = {
+    "type": "web_service",
+    "name": "osint-platform-api",
+    "ownerId": owner_id,
+    "env": "python",
+    "plan": "free",
+    "region": "oregon",
+    "repo": "https://github.com/lordsadistov-beep/osint-platform",
+    "autoDeploy": "yes",
+    "branch": "master",
+    "rootDir": "backend",
+    "serviceDetails": {
+        "buildCommand": "pip install -r requirements.txt",
+        "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
+        "healthCheckPath": "/health"
+    }
+}
+status, result = api("POST", "/services", payload2)
+print(f"Try 2 (env top-level, flat serviceDetails) HTTP {status}: {json.dumps(result, indent=2)}")
+if status == 201:
+    print(f"SUCCESS! New service ID: {result.get('id')}")
+    raise SystemExit(0)
+
+# Try with env inside serviceDetails as runtime field
+payload3 = {
+    "type": "web_service",
+    "name": "osint-platform-api",
+    "ownerId": owner_id,
+    "plan": "free",
+    "region": "oregon",
+    "repo": "https://github.com/lordsadistov-beep/osint-platform",
+    "autoDeploy": "yes",
+    "branch": "master",
+    "rootDir": "backend",
+    "serviceDetails": {
+        "runtime": "python",
+        "healthCheckPath": "/health",
+        "envSpecificDetails": {
+            "buildCommand": "pip install -r requirements.txt",
+            "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+        }
+    }
+}
+status, result = api("POST", "/services", payload3)
+print(f"Try 3 (runtime in serviceDetails) HTTP {status}: {json.dumps(result, indent=2)}")
 if status == 201:
     print(f"SUCCESS! New service ID: {result.get('id')}")
 else:
-    # Try 2: env as top-level with serviceDetails
-    payload2 = dict(payload1)
-    payload2["env"] = "python"
-    del payload2["runtime"]
-    status, result = api("POST", "/services", payload2)
-    print(f"Try 2 (env top-level) HTTP {status}: {json.dumps(result, indent=2)}")
-    if status == 201:
-        print(f"SUCCESS! New service ID: {result.get('id')}")
-    else:
-        print("ALL FAILED")
+    print("ALL FAILED")
