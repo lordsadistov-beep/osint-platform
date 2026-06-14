@@ -8,39 +8,33 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Debug deploys response
+      - name: Get full deploy info
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
           BASE="https://api.render.com/v1"
           SVC_ID="srv-d8mtljrbc2fs73ecqcug"
-          echo "=== Raw deploys response type and keys ==="
-          curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys?limit=2" | python3 -c "
+
+          echo "=== All deploys ==="
+          curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys?limit=10" | python3 -c "
           import sys, json
-          d = json.loads(sys.stdin.read())
-          print('Type:', type(d).__name__)
-          if isinstance(d, dict):
-              print('Keys:', list(d.keys()))
-              print('First 500 chars:', json.dumps(d, indent=2)[:500])
-          elif isinstance(d, list) and len(d) > 0:
-              print('List length:', len(d))
-              print('First item keys:', list(d[0].keys()))
-              print(json.dumps(d[0], indent=2))
-          else:
-              print('Unexpected format:', repr(d)[:500])
+          data = json.loads(sys.stdin.read())
+          for item in data:
+              d = item['deploy']
+              c = d.get('commit',{})
+              print(f\"{d['id']}: status={d['status']} trigger={d.get('trigger')} msg='{c.get('message','')[:50]}' finished={d.get('finishedAt','N/A')}\")
+          print(f\"\\nTotal: {len(data)} deploys\")
           "
 
           echo ""
-          echo "=== Try deploys with cursor=0 ==="
-          curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys?limit=2&cursor=0" | python3 -c "
+          echo "=== Check if PORT env var is set ==="
+          env_vars=$(curl -s -H "$AUTH" "$BASE/services/$SVC_ID/env-vars")
+          echo "$env_vars" | python3 -c "
           import sys, json
-          d = json.loads(sys.stdin.read())
-          print('Type:', type(d).__name__)
-          if isinstance(d, dict):
-              print('Keys:', list(d.keys()))
-              print(json.dumps(d, indent=2)[:500])
-          elif isinstance(d, list):
-              print('List length:', len(d))
-              for item in d:
-                  print(json.dumps(item, indent=2)[:300])
+          envs = json.loads(sys.stdin.read())
+          for e in envs:
+              val = e.get('value','')
+              if len(val) > 40:
+                  val = val[:20] + '...' + val[-20:]
+              print(f\"  {e['key']} = {val}\")
           "
