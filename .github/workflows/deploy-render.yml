@@ -8,33 +8,22 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Get full deploy info
+      - name: Debug env vars
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
           BASE="https://api.render.com/v1"
           SVC_ID="srv-d8mtljrbc2fs73ecqcug"
-
-          echo "=== All deploys ==="
-          curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys?limit=10" | python3 -c "
-          import sys, json
-          data = json.loads(sys.stdin.read())
-          for item in data:
-              d = item['deploy']
-              c = d.get('commit',{})
-              print(f\"{d['id']}: status={d['status']} trigger={d.get('trigger')} msg='{c.get('message','')[:50]}' finished={d.get('finishedAt','N/A')}\")
-          print(f\"\\nTotal: {len(data)} deploys\")
-          "
+          
+          echo "=== Raw env-vars response ==="
+          curl -v -H "$AUTH" "$BASE/services/$SVC_ID/env-vars" 2>&1
 
           echo ""
-          echo "=== Check if PORT env var is set ==="
-          env_vars=$(curl -s -H "$AUTH" "$BASE/services/$SVC_ID/env-vars")
-          echo "$env_vars" | python3 -c "
-          import sys, json
-          envs = json.loads(sys.stdin.read())
-          for e in envs:
-              val = e.get('value','')
-              if len(val) > 40:
-                  val = val[:20] + '...' + val[-20:]
-              print(f\"  {e['key']} = {val}\")
+          echo "=== Check service envSpecificDetails ==="
+          curl -s -H "$AUTH" "$BASE/services/$SVC_ID" | python3 -c "
+          import sys,json
+          d=json.load(sys.stdin)
+          esd=d['serviceDetails'].get('envSpecificDetails',{})
+          for k,v in esd.items():
+              print(f'  {k}: {v}')
           "
