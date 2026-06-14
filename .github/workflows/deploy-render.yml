@@ -9,46 +9,19 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Fix services and deploy
+      - name: Inspect PG and set connection
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
-          CT="Content-Type: application/json"
           BASE="https://api.render.com/v1"
-          SVC_ID="srv-d8mtljrbc2fs73ecqcug"
-          STATIC_ID="srv-d8nf52btqb8s73d4cgeg"
           PG_ID="dpg-d8nf51nlk1mc739m3g90-a"
+          SVC_ID="srv-d8mtljrbc2fs73ecqcug"
           
-          echo "=== 1. Fix static site config ==="
-          curl -s -w "\nHTTP %{http_code}" -X PATCH -H "$AUTH" -H "$CT" \
-            -d '{"serviceDetails":{"buildCommand":"npm install && npm run build","publishPath":"dist"}}' \
-            "$BASE/services/$STATIC_ID"
-          echo ""
+          echo "=== Full PG object ==="
+          PG_INFO=$(curl -s -H "$AUTH" "$BASE/postgres/$PG_ID")
+          echo "$PG_INFO" | python3 -m json.tool
           
-          echo "=== 1.5. Set VITE_API_URL on static site ==="
-          curl -s -w "\nHTTP %{http_code}" -X PATCH -H "$AUTH" -H "$CT" \
-            -d '{"envVars":[{"key":"VITE_API_URL","value":"https://osint-platform-w0n6.onrender.com"}]}' \
-            "$BASE/services/$STATIC_ID"
+          echo "=== Get connection info via different endpoints ==="
+          curl -s -w "\nHTTP %{http_code}" -H "$AUTH" "$BASE/postgres/$PG_ID/connection-info"
           echo ""
-
-          echo "=== 2. Wait for PG and set DATABASE_URL ==="
-          for i in 1 2 3 4 5; do
-            PG_INFO=$(curl -s -H "$AUTH" "$BASE/postgres/$PG_ID")
-            STATUS=$(echo "$PG_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))")
-            echo "PG status: $STATUS (attempt $i)"
-            if [ "$STATUS" = "available" ]; then
-              PG_CONN=$(echo "$PG_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['connectionInfo']['connectionString'])")
-              echo "Got PG conn string, setting on web service..."
-              curl -s -w " result=%{http_code}" -X PATCH -H "$AUTH" -H "$CT" \
-                -d "{\"envVars\":[{\"key\":\"DATABASE_URL\",\"value\":\"${PG_CONN}\"}]}" \
-                "$BASE/services/$SVC_ID"
-              break
-            fi
-            sleep 10
-          done
-          echo ""
-          
-          echo "=== 3. Trigger deploy on web service ==="
-          curl -s -w "\nHTTP %{http_code}" -X POST -H "$AUTH" -H "$CT" \
-            -d '{"clearCache":"do_not_clear"}' \
-            "$BASE/services/$SVC_ID/deploys"
+          curl -s -w "\nHTTP %{http_code}" -H "$AUTH" "$BASE/databases/$PG_ID/connection-info"
