@@ -8,29 +8,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Try setting Python version then deploy
+      - name: Trigger deploy and wait
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
           CT="Content-Type: application/json"
           BASE="https://api.render.com/v1"
           SVC_ID="srv-d8mtljrbc2fs73ecqcug"
-
-          echo "=== Try setting Python version via PATCH ==="
-          curl -s -X PATCH -H "$AUTH" -H "$CT" \
-            -d '{"serviceDetails":{"envSpecificDetails":{"buildCommand":"pip install -r requirements.txt","startCommand":"cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT","pythonVersion":"3.11.10"}}}' \
-            "$BASE/services/$SVC_ID" | python3 -c "
-          import sys, json
-          d = json.load(sys.stdin)
-          sd = d.get('serviceDetails',{})
-          esd = sd.get('envSpecificDetails',{})
-          for k,v in esd.items():
-              print(f'  {k}: {v}')
-          "
-
-          echo ""
-          echo "=== Deploy ==="
           PG_ID="dpg-d8nf51nlk1mc739m3g90-a"
+
           CONN_INFO=$(curl -s -H "$AUTH" "$BASE/postgres/$PG_ID/connection-info")
           PG_PASS=$(echo "$CONN_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin)['password'])")
           DATABASE_URL="postgresql+asyncpg://osint_platform_y27c_user:${PG_PASS}@dpg-d8nf51nlk1mc739m3g90-a:5432/osint_platform_y27c"
@@ -45,7 +31,11 @@ jobs:
           echo "Deploy: $DEP_ID"
 
           sleep 180
-          echo "=== Status ==="
+          echo "=== Deploy status ==="
           curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys/$DEP_ID" | python3 -c "import sys,json; d=json.load(sys.stdin); print('Status:', d.get('status')); print('Finished:', d.get('finishedAt','N/A'))"
+
           echo "=== Backend ==="
           curl -s --max-time 10 "https://osint-platform-w0n6.onrender.com/health" || echo "(unreachable)"
+          echo ""
+          echo "=== Frontend ==="
+          curl -s --max-time 10 "https://osint-platform-frontend.onrender.com" || echo "(unreachable)"

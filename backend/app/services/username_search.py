@@ -1,5 +1,6 @@
 import asyncio
 import aiohttp
+from typing import Optional
 
 SITES = {
     "github": "https://github.com/{}",
@@ -12,7 +13,7 @@ SITES = {
 }
 
 
-async def check_site(session: aiohttp.ClientSession, name: str, url_template: str, username: str) -> dict | None:
+async def check_site(session: aiohttp.ClientSession, name: str, url_template: str, username: str) -> Optional[dict]:
     url = url_template.format(username)
     try:
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
@@ -32,3 +33,5 @@ async def search_username(username: str) -> list[dict]:
         if r:
             found.append(r)
     return found
+
+

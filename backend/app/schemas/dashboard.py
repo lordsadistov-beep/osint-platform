@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 import uuid
+from typing import Optional
 
 
 class DashboardStats(BaseModel):
@@ -17,7 +18,7 @@ class HistoryItem(BaseModel):
     id: uuid.UUID
     tool_slug: str
     query: str
-    result_summary: dict | None = None
+    result_summary: Optional[dict] = None
     created_at: datetime
 
     class Config:
@@ -33,3 +34,5 @@ class PaginatedHistory(BaseModel):
 
 class ExportRequest(BaseModel):
     format: str = "json"
+
+

@@ -10,6 +10,8 @@ from ...core.dependencies import get_current_user
 from ...models.user import User
 from ...models.search_history import SearchHistory
 from ...schemas.tool import UsernameSearchResponse, UsernameSearchResult
+from typing import Optional
+from typing import Optional
 
 router = APIRouter()
 
@@ -47,7 +49,7 @@ SITES = {
 }
 
 
-async def check_site(session: aiohttp.ClientSession, site_name: str, site_config: dict, username: str) -> dict | None:
+async def check_site(session: aiohttp.ClientSession, site_name: str, site_config: dict, username: str) -> Optional[dict]:
     url = site_config["url"].format(username)
     try:
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=5), allow_redirects=False) as resp:
@@ -130,3 +132,5 @@ async def username_search(
         not_found_count=len(SITES) - len(found),
         elapsed_ms=elapsed,
     )
+
+

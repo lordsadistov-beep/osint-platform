@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional
 
 
 class RegisterRequest(BaseModel):
@@ -32,6 +33,8 @@ class RefreshRequest(BaseModel):
 
 
 class UpdateProfileRequest(BaseModel):
-    username: str | None = None
-    email: str | None = None
-    avatar_url: str | None = None
+    username: Optional[str] = None
+    email: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+

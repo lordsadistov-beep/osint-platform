@@ -1,14 +1,15 @@
 from pydantic import BaseModel
 from datetime import datetime
 import uuid
+from typing import Optional
 
 
 class UserResponse(BaseModel):
     id: uuid.UUID
-    telegram_id: int | None
+    telegram_id: Optional[int]
     username: str
-    email: str | None
-    avatar_url: str | None
+    email: Optional[str]
+    avatar_url: Optional[str]
     role: str
     experience: int
     level: int
@@ -16,3 +17,5 @@ class UserResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+

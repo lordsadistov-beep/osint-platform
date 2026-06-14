@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 import uuid
+from typing import Optional
 
 
 class ChallengeResponse(BaseModel):
@@ -11,7 +12,7 @@ class ChallengeResponse(BaseModel):
     difficulty: str
     points: int
     category: str
-    expected_tool: str | None
+    expected_tool: Optional[str]
     is_active: bool
 
     class Config:
@@ -19,7 +20,7 @@ class ChallengeResponse(BaseModel):
 
 
 class ChallengeDetailResponse(ChallengeResponse):
-    hint: str | None = None
+    hint: Optional[str] = None
 
 
 class SubmitFlagRequest(BaseModel):
@@ -39,6 +40,8 @@ class HintResponse(BaseModel):
 class LeaderboardEntry(BaseModel):
     user_id: uuid.UUID
     username: str
-    avatar_url: str | None
+    avatar_url: Optional[str]
     points: int
     solved_count: int
+
+

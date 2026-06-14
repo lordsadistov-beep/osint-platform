@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional
 import uuid
 
 
@@ -7,13 +8,13 @@ class LessonResponse(BaseModel):
     id: uuid.UUID
     title: str
     slug: str
-    description: str | None
+    description: Optional[str]
     category: str
     difficulty: str
     order_index: int
-    tool_slug: str | None
+    tool_slug: Optional[str]
     xp_reward: int
-    estimated_minutes: int | None
+    estimated_minutes: Optional[int]
     is_published: bool
     created_at: datetime
 
@@ -28,7 +29,7 @@ class LessonDetailResponse(LessonResponse):
 class LessonProgressResponse(BaseModel):
     lesson_id: uuid.UUID
     completed: bool
-    completed_at: datetime | None
+    completed_at: Optional[datetime]
 
 
 class CategoryResponse(BaseModel):
@@ -47,6 +48,6 @@ class CompleteLessonResponse(BaseModel):
 
 
 class RelatedResponse(BaseModel):
-    tool: dict | None
+    tool: Optional[dict]
     challenges: list
-    next_lesson: LessonResponse | None
+    next_lesson: Optional[LessonResponse]

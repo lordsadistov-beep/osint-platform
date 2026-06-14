@@ -1,13 +1,14 @@
 from pydantic import BaseModel
 import uuid
+from typing import Optional
 
 
 class ToolResponse(BaseModel):
     id: uuid.UUID
     name: str
     slug: str
-    description: str | None
-    icon: str | None
+    description: Optional[str]
+    icon: Optional[str]
     is_active: bool
 
     class Config:
@@ -18,8 +19,8 @@ class UsernameSearchResult(BaseModel):
     site: str
     url: str
     profile_exists: bool
-    avatar: str | None = None
-    name: str | None = None
+    avatar: Optional[str] = None
+    name: Optional[str] = None
 
 
 class UsernameSearchResponse(BaseModel):
@@ -32,28 +33,28 @@ class UsernameSearchResponse(BaseModel):
 
 class EmailCheckResponse(BaseModel):
     email: str
-    gravatar: str | None = None
+    gravatar: Optional[str] = None
     breaches: list[str] = []
     associated_sites: list[str] = []
-    domain_info: dict | None = None
+    domain_info: Optional[dict] = None
 
 
 class PhoneCheckResponse(BaseModel):
     phone: str
-    country: str | None = None
-    carrier: str | None = None
-    possible_owner: str | None = None
+    country: Optional[str] = None
+    carrier: Optional[str] = None
+    possible_owner: Optional[str] = None
     messengers: dict = {}
     breaches: list[str] = []
 
 
 class DomainLookupResponse(BaseModel):
     domain: str
-    whois: dict | None = None
-    dns: dict | None = None
-    ip: str | None = None
-    ip_geo: dict | None = None
-    ssl: dict | None = None
+    whois: Optional[dict] = None
+    dns: Optional[dict] = None
+    ip: Optional[str] = None
+    ip_geo: Optional[dict] = None
+    ssl: Optional[dict] = None
     subdomains: list[str] = []
 
 
@@ -62,10 +63,10 @@ class MetadataResponse(BaseModel):
     size: int
     type: str
     exif: dict = {}
-    gps: dict | None = None
-    created_date: str | None = None
-    camera: str | None = None
-    software: str | None = None
+    gps: Optional[dict] = None
+    created_date: Optional[str] = None
+    camera: Optional[str] = None
+    software: Optional[str] = None
 
 
 class LeakSearchRequest(BaseModel):
@@ -74,14 +75,14 @@ class LeakSearchRequest(BaseModel):
 
 
 class LeakEntryResponse(BaseModel):
-    email: str | None = None
-    username: str | None = None
-    password_hash: str | None = None
-    password_plain: str | None = None
+    email: Optional[str] = None
+    username: Optional[str] = None
+    password_hash: Optional[str] = None
+    password_plain: Optional[str] = None
     source: str
-    breach_name: str | None = None
-    ip_address: str | None = None
-    phone: str | None = None
+    breach_name: Optional[str] = None
+    ip_address: Optional[str] = None
+    phone: Optional[str] = None
 
 
 class LeakSearchResponse(BaseModel):
@@ -100,7 +101,7 @@ class GraphNode(BaseModel):
 class GraphEdge(BaseModel):
     source: str
     target: str
-    relationship: str | None = None
+    relationship: Optional[str] = None
 
 
 class GraphResponse(BaseModel):
@@ -113,4 +114,6 @@ class SaveConnectionRequest(BaseModel):
     source_value: str
     target_type: str
     target_value: str
-    relationship: str | None = None
+    relationship: Optional[str] = None
+
+

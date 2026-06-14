@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 import uuid
 from datetime import datetime
+from typing import Optional
 
 
 class ConnectionResponse(BaseModel):
@@ -9,8 +10,10 @@ class ConnectionResponse(BaseModel):
     source_value: str
     target_type: str
     target_value: str
-    relationship: str | None = None
+    relationship: Optional[str] = None
     created_at: datetime
 
     class Config:
         orm_mode = True
+
+
