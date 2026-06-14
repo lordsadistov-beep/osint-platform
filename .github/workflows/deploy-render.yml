@@ -8,31 +8,38 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Create new web service with correct API format
+      - name: Get owner and create service
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
           CT="Content-Type: application/json"
           BASE="https://api.render.com/v1"
+          FE_SVC="srv-d8nf52btqb8s73d4cgeg"
 
-          echo "=== Create web service ==="
-          RESP=$(curl -s -w "\n%{http_code}" -X POST -H "$AUTH" -H "$CT" \
-            -d '{
-              "type": "web_service",
-              "name": "osint-platform-api",
-              "env": "python",
-              "plan": "free",
-              "region": "oregon",
-              "buildCommand": "pip install -r requirements.txt",
-              "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
-              "healthCheckPath": "/health",
-              "repo": "https://github.com/lordsadistov-beep/osint-platform",
-              "autoDeploy": "yes",
-              "branch": "master",
-              "rootDir": "backend"
-            }' \
-            "$BASE/services" 2>/dev/null)
-          HTTP_CODE=$(echo "$RESP" | tail -1)
-          BODY=$(echo "$RESP" | head -n -1)
-          echo "HTTP: $HTTP_CODE"
-          echo "Body: $BODY"
+          echo "=== Get user info ==="
+          curl -s -H "$AUTH" "$BASE/user" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print(json.dumps(d, indent=2))
+"
+
+          echo ""
+          echo "=== Get static site info for ownerID ==="
+          curl -s -H "$AUTH" "$BASE/services/$FE_SVC" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print('ownerID:', d.get('ownerId','?'))
+print('userID in serviceDetails:', d.get('serviceDetails',{}).get('ownerId','?'))
+"
+
+          echo ""
+          echo "=== List owners ==="
+          curl -s -H "$AUTH" "$BASE/owners" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+if isinstance(d, list):
+    for o in d:
+        print(f'  ID={o.get(\"id\")} name={o.get(\"name\")} type={o.get(\"type\")}')
+else:
+    print(json.dumps(d, indent=2))
+"
