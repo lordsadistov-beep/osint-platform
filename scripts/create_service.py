@@ -17,11 +17,18 @@ def api(method, path, data=None):
     except urllib.error.HTTPError as e:
         return e.code, json.loads(e.read().decode())
 
-# 1. Get user info
-status, user = api("GET", "/user")
-print(f"User: {json.dumps(user, indent=2)}")
+# Check existing services
+status, services = api("GET", "/services")
+print("Existing services:")
+if isinstance(services, list):
+    for s in services:
+        print(f"  {s.get('id')} {s.get('name')} type={s.get('type')}")
+else:
+    print(f"  {json.dumps(services, indent=2)}")
 
-# 2. Get static site info
+print()
+
+# Get static site info for ownerId
 status, fe = api("GET", "/services/srv-d8nf52btqb8s73d4cgeg")
 print(f"\nStatic site ownerId: {fe.get('ownerId', '?')}")
 
