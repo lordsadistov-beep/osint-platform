@@ -8,50 +8,31 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Fix rootDir + startCommand, then deploy
+      - name: Test minimal Python server
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
           CT="Content-Type: application/json"
           BASE="https://api.render.com/v1"
           SVC_ID="srv-d8mtljrbc2fs73ecqcug"
-          PG_ID="dpg-d8nf51nlk1mc739m3g90-a"
 
-          echo "=== Setting rootDir to backend/ and simplifying startCommand ==="
+          echo "=== Set startCommand to test_server.py ==="
           curl -s -X PATCH -H "$AUTH" -H "$CT" \
-            -d '{"serviceDetails":{"envSpecificDetails":{"buildCommand":"pip install -r requirements.txt","startCommand":"uvicorn app.main:app --host 0.0.0.0 --port $PORT"}},"rootDir":"backend"}' \
+            -d '{"serviceDetails":{"envSpecificDetails":{"buildCommand":"echo skip build","startCommand":"python test_server.py"}}}' \
             "$BASE/services/$SVC_ID" | python3 -c "
-          import sys, json
-          d = json.load(sys.stdin)
-          print('rootDir:', d.get('rootDir'))
-          sd = d.get('serviceDetails',{})
-          esd = sd.get('envSpecificDetails',{})
-          for k,v in esd.items():
-              print(f'  {k}: {v}')
+          import sys,json
+          d=json.load(sys.stdin)
+          esd=d.get('serviceDetails',{}).get('envSpecificDetails',{})
+          print('startCommand:', esd.get('startCommand','?'))
+          print('buildCommand:', esd.get('buildCommand','?'))
           "
-
-          echo ""
-          echo "=== Update env vars ==="
-          CONN_INFO=$(curl -s -H "$AUTH" "$BASE/postgres/$PG_ID/connection-info")
-          PG_PASS=$(echo "$CONN_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin)['password'])")
-          DATABASE_URL="postgresql+asyncpg://osint_platform_y27c_user:${PG_PASS}@dpg-d8nf51nlk1mc739m3g90-a:5432/osint_platform_y27c"
-
-          curl -s -X PATCH -H "$AUTH" -H "$CT" \
-            -d "{\"envVars\":[{\"key\":\"DATABASE_URL\",\"value\":\"${DATABASE_URL}\"},{\"key\":\"FRONTEND_URL\",\"value\":\"https://osint-platform-frontend.onrender.com\"},{\"key\":\"CORS_ORIGINS\",\"value\":\"[\\\"https://osint-platform-frontend.onrender.com\\\"]\"}]}" \
-            "$BASE/services/$SVC_ID"
-
-          echo "=== Trigger deploy ==="
+          echo "=== Deploy ==="
           DEP_ID=$(curl -s -X POST -H "$AUTH" -H "$CT" \
             -d '{"clearCache":"do_not_clear"}' \
             "$BASE/services/$SVC_ID/deploys" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
           echo "Deploy: $DEP_ID"
-
-          sleep 180
+          sleep 90
           echo "=== Status ==="
           curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys/$DEP_ID" | python3 -c "import sys,json; d=json.load(sys.stdin); print('Status:', d.get('status')); print('Finished:', d.get('finishedAt','N/A'))"
-
-          echo "=== Backend ==="
+          echo "=== Health ==="
           curl -s --max-time 10 "https://osint-platform-w0n6.onrender.com/health" || echo "(unreachable)"
-          echo ""
-          echo "=== Frontend ==="
-          curl -s --max-time 10 "https://osint-platform-frontend.onrender.com" || echo "(unreachable)"
