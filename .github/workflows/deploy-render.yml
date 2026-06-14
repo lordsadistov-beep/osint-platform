@@ -1,0 +1,33 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync Render Blueprint
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST https://api.render.com/v1/blueprint/sync \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP $HTTP_CODE: $BODY"
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo ""
+            echo "=============================================="
+            echo "Blueprint sync failed (HTTP $HTTP_CODE)"
+            echo "This usually means Blueprint is not enabled."
+            echo ""
+            echo "Fix (one-time):"
+            echo "1. Go to https://dashboard.render.com/blueprint"
+            echo "2. Connect lordsadistov-beep/osint-platform"
+            echo "3. After that, every push will auto-deploy"
+            echo "=============================================="
+            exit 1
+          fi
