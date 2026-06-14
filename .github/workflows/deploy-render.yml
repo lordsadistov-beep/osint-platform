@@ -29,14 +29,33 @@ jobs:
             -d '{"clearCache":"do_not_clear"}' \
             "$BASE/services/$SVC_ID/deploys"
 
-  health:
+  status:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    needs: deploy
     steps:
-      - name: Check services
+      - name: Check deploy result
         run: |
+          KEY="${{ secrets.RENDER_API_KEY }}"
+          AUTH="Authorization: Bearer $KEY"
+          SVC_ID="srv-d8mtljrbc2fs73ecqcug"
+          echo "=== Last deploy status ==="
+          DEPLOY=$(curl -s --max-time 30 -H "$AUTH" "https://api.render.com/v1/services/$SVC_ID/deploys?limit=1")
+          echo "$DEPLOY" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+dep = d[0]
+print('Status:', dep.get('status'))
+if dep.get('status') == 'live':
+    print('SUCCESS - service is live')
+elif dep.get('status') == 'build_failed':
+    print('FAILED - build error')
+    print('Logs:', dep.get('buildLogs','N/A'))
+else:
+    print('State:', dep.get('status'))
+"
+          echo ""
           echo "=== Backend /health ==="
-          curl -s -w "\nHTTP %{http_code}" --connect-timeout 15 https://osint-platform-w0n6.onrender.com/health || echo "(unreachable)"
+          curl -s --max-time 15 -w "\nHTTP %{http_code}" "https://osint-platform-w0n6.onrender.com/health" || echo "(unreachable)"
           echo ""
           echo "=== Frontend ==="
-          curl -s -w "\nHTTP %{http_code}" --connect-timeout 15 https://osint-platform-frontend.onrender.com || echo "(unreachable)"
+          curl -s --max-time 15 -w "\nHTTP %{http_code}" "https://osint-platform-frontend.onrender.com" || echo "(unreachable)"
