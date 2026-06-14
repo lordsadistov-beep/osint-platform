@@ -17,34 +17,23 @@ def api(method, path, data=None):
     except urllib.error.HTTPError as e:
         return e.code, json.loads(e.read().decode())
 
-# Check existing services
-status, services = api("GET", "/services")
-print("Existing services:")
-if isinstance(services, list):
-    for s in services:
-        print(f"  {s.get('id')} {s.get('name')} type={s.get('type')}")
-else:
-    print(f"  {json.dumps(services, indent=2)}")
-
-print()
-
-# Get static site info for ownerId
-status, fe = api("GET", "/services/srv-d8nf52btqb8s73d4cgeg")
-print(f"\nStatic site ownerId: {fe.get('ownerId', '?')}")
-
-# 3. Get owners
+# Get owners
 status, owners = api("GET", "/owners")
-print(f"\nOwners: {json.dumps(owners, indent=2)}")
-
-# Use first owner's id
+print(f"Owners raw: {json.dumps(owners, indent=2)[:500]}")
+owner_id = None
 if isinstance(owners, list) and owners:
-    owner_id = owners[0]["id"]
-    print(f"\nUsing ownerId: {owner_id}")
-else:
-    owner_id = fe.get("ownerId")
-    print(f"\nUsing fallback ownerId: {owner_id}")
+    entry = owners[0]
+    if "owner" in entry:
+        owner_id = entry["owner"]["id"]
+    else:
+        owner_id = entry.get("id")
+print(f"Using ownerId: {owner_id}")
 
-# 4. Create web service
+# Get static site for verification
+status, fe = api("GET", "/services/srv-d8nf52btqb8s73d4cgeg")
+print(f"FE ownerId: {fe.get('ownerId', fe.get('serviceDetails', {}).get('ownerId', '?'))}")
+
+# Create web service
 payload = {
     "type": "web_service",
     "name": "osint-platform-api",
