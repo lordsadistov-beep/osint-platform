@@ -8,25 +8,32 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Check build failure
+      - name: Connect PG, update env vars, and trigger deploy
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
+          CT="Content-Type: application/json"
           BASE="https://api.render.com/v1"
           SVC_ID="srv-d8mtljrbc2fs73ecqcug"
-          
-          echo "=== Failed deploy details ==="
-          curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys/dep-d8nfkhhkh4rs73f6au80" | python3 -c "
-          import sys, json
-          d = json.load(sys.stdin)
-          print('Status:', d.get('status'))
-          print('Finished:', d.get('finishedAt','N/A'))
-          print('Trigger:', d.get('trigger','N/A'))
-          bl = d.get('buildLogs')
-          if bl:
-              print('--- Build logs (last 2000 chars) ---')
-              print(bl[-2000:])
-          else:
-              print('No build logs in response')
-              print('Keys:', list(d.keys()))
-          "
+          PG_ID="dpg-d8nf51nlk1mc739m3g90-a"
+
+          CONN_INFO=$(curl -s -H "$AUTH" "$BASE/postgres/$PG_ID/connection-info")
+          PG_PASS=$(echo "$CONN_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin)['password'])")
+          DATABASE_URL="postgresql+asyncpg://osint_platform_y27c_user:${PG_PASS}@dpg-d8nf51nlk1mc739m3g90-a:5432/osint_platform_y27c"
+
+          curl -s -X PATCH -H "$AUTH" -H "$CT" \
+            -d "{\"envVars\":[{\"key\":\"DATABASE_URL\",\"value\":\"${DATABASE_URL}\"},{\"key\":\"FRONTEND_URL\",\"value\":\"https://osint-platform-frontend.onrender.com\"},{\"key\":\"CORS_ORIGINS\",\"value\":\"[\\\"https://osint-platform-frontend.onrender.com\\\"]\"}]}" \
+            "$BASE/services/$SVC_ID"
+
+          curl -s -X POST -H "$AUTH" -H "$CT" \
+            -d '{"clearCache":"do_not_clear"}' \
+            "$BASE/services/$SVC_ID/deploys"
+
+          echo "=== Waiting 4 min for build+deploy ==="
+          sleep 240
+
+          echo "=== Backend health ==="
+          curl -s --max-time 10 "https://osint-platform-w0n6.onrender.com/health" || echo "(unreachable)"
+          echo ""
+          echo "=== Frontend ==="
+          curl -s --max-time 10 "https://osint-platform-frontend.onrender.com" || echo "(unreachable)"
