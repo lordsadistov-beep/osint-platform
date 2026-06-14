@@ -9,25 +9,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Sync Render Blueprint
+      - name: Probe Render API
         run: |
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST https://api.render.com/v1/blueprint/sync \
-            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{}')
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "HTTP $HTTP_CODE: $BODY"
-          if [ "$HTTP_CODE" -ne 200 ]; then
-            echo ""
-            echo "=============================================="
-            echo "Blueprint sync failed (HTTP $HTTP_CODE)"
-            echo "This usually means Blueprint is not enabled."
-            echo ""
-            echo "Fix (one-time):"
-            echo "1. Go to https://dashboard.render.com/blueprint"
-            echo "2. Connect lordsadistov-beep/osint-platform"
-            echo "3. After that, every push will auto-deploy"
-            echo "=============================================="
-            exit 1
-          fi
+          API_KEY="${{ secrets.RENDER_API_KEY }}"
+          AUTH="Authorization: Bearer $API_KEY"
+          echo "=== Testing Render API endpoints ==="
+          for path in /v1/blueprint /v1/blueprints /v1/blueprint/sync /v1/blueprints/sync /v1/services /v1/owner; do
+            code=$(curl -s -o /tmp/resp.json -w "%{http_code}" -H "$AUTH" "https://api.render.com$path")
+            echo "$path -> HTTP $code"
+            if [ "$code" != "000" ]; then
+              echo "  Body: $(head -c 200 /tmp/resp.json)"
+            fi
+          done
