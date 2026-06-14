@@ -9,15 +9,32 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Create Rendr services via API
+      - name: Setup environment
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
           CT="Content-Type: application/json"
+          BASE="https://api.render.com/v1"
           
-          echo "=== List existing services ==="
-          curl -s -w "\nHTTP %{http_code}" -H "$AUTH" https://api.render.com/v1/services
-          echo ""
+          echo "AUTH=$AUTH" >> $GITHUB_ENV
+          echo "CT=$CT" >> $GITHUB_ENV
+          echo "BASE=$BASE" >> $GITHUB_ENV
+          echo "KEY=$KEY" >> $GITHUB_ENV
+      
+      - name: Get owner and existing services
+        id: info
+        run: |
+          echo "=== Owners ==="
+          OWNERS=$(curl -s -H "$AUTH" "$BASE/owners")
+          echo "$OWNERS"
+          echo "OWNERS=$OWNERS" >> $GITHUB_ENV
           
-          echo "=== List owners ==="
-          curl -s -w "\nHTTP %{http_code}" -H "$AUTH" https://api.render.com/v1/owners
+          echo "=== Existing services ==="
+          SERVICES=$(curl -s -H "$AUTH" "$BASE/services")
+          echo "$SERVICES"
+          echo "SERVICES=$SERVICES" >> $GITHUB_ENV
+          
+          echo "=== Existing static sites ==="
+          STATIC=$(curl -s -H "$AUTH" "$BASE/static-sites")
+          echo "$STATIC"
+          echo "STATIC=$STATIC" >> $GITHUB_ENV
