@@ -8,20 +8,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Create fresh web service and test
+      - name: Create new web service with correct API format
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
           CT="Content-Type: application/json"
           BASE="https://api.render.com/v1"
-          OLD_SVC="srv-d8mtljrbc2fs73ecqcug"
 
-          echo "=== Delete old service ==="
-          curl -s -X DELETE -H "$AUTH" "$BASE/services/$OLD_SVC" && echo "Deleted"
-          sleep 5
-
-          echo "=== Create new web service ==="
-          RESULT=$(curl -s -X POST -H "$AUTH" -H "$CT" \
+          echo "=== Create web service ==="
+          RESP=$(curl -s -w "\n%{http_code}" -X POST -H "$AUTH" -H "$CT" \
             -d '{
               "type": "web_service",
               "name": "osint-platform-api",
@@ -36,11 +31,8 @@ jobs:
               "branch": "master",
               "rootDir": "backend"
             }' \
-            "$BASE/services")
-          echo "$RESULT" | python3 -c "
-          import sys,json
-          d=json.load(sys.stdin)
-          print('New service ID:', d.get('id','?'))
-          print('Name:', d.get('name'))
-          print('Status:', d.get('status','?'))
-          "
+            "$BASE/services" 2>/dev/null)
+          HTTP_CODE=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "HTTP: $HTTP_CODE"
+          echo "Body: $BODY"
