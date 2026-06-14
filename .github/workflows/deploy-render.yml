@@ -9,15 +9,17 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe Render API
+      - name: Debug Render API auth
         run: |
-          API_KEY="${{ secrets.RENDER_API_KEY }}"
-          AUTH="Authorization: Bearer $API_KEY"
-          echo "=== Testing Render API endpoints ==="
-          for path in /v1/blueprint /v1/blueprints /v1/blueprint/sync /v1/blueprints/sync /v1/services /v1/owner; do
-            code=$(curl -s -o /tmp/resp.json -w "%{http_code}" -H "$AUTH" "https://api.render.com$path")
-            echo "$path -> HTTP $code"
-            if [ "$code" != "000" ]; then
-              echo "  Body: $(head -c 200 /tmp/resp.json)"
-            fi
-          done
+          KEY="${{ secrets.RENDER_API_KEY }}"
+          echo "=== Bearer auth ==="
+          curl -s -w "\nHTTP %{http_code}" -H "Authorization: Bearer $KEY" https://api.render.com/v1/services
+          echo ""
+          echo "=== X-API-Key auth ==="
+          curl -s -w "\nHTTP %{http_code}" -H "X-API-Key: $KEY" https://api.render.com/v1/services
+          echo ""
+          echo "=== Bearer on /v1/blueprints ==="
+          curl -s -w "\nHTTP %{http_code}" -H "Authorization: Bearer $KEY" https://api.render.com/v1/blueprints
+          echo ""
+          echo "=== Bearer on /v1/blueprint-endpoints ==="
+          curl -s -w "\nHTTP %{http_code}" -H "Authorization: Bearer $KEY" https://api.render.com/v1/blueprint-endpoints
