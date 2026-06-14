@@ -9,12 +9,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Sync Render Blueprint
+      - name: Create Rendr services via API
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
-          echo "=== POST /v1/blueprints ==="
-          curl -s -w "\nHTTP %{http_code}" -X POST -H "$AUTH" -H "Content-Type: application/json" -d '{}' https://api.render.com/v1/blueprints
+          CT="Content-Type: application/json"
+          
+          echo "=== List existing services ==="
+          curl -s -w "\nHTTP %{http_code}" -H "$AUTH" https://api.render.com/v1/services
           echo ""
-          echo "=== GET /v1/blueprints ==="
-          curl -s -w "\nHTTP %{http_code}" -X GET -H "$AUTH" https://api.render.com/v1/blueprints
+          
+          echo "=== List owners ==="
+          curl -s -w "\nHTTP %{http_code}" -H "$AUTH" https://api.render.com/v1/owners
