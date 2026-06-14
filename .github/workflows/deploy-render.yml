@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Configure and deploy
+      - name: Connect PG and trigger deploy
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
@@ -19,29 +19,17 @@ jobs:
           STATIC_ID="srv-d8nf52btqb8s73d4cgeg"
           PG_ID="dpg-d8nf51nlk1mc739m3g90-a"
           
-          echo "=== 1. Get PG connection info ==="
+          # Get PG password and build connection string
           CONN_INFO=$(curl -s -H "$AUTH" "$BASE/postgres/$PG_ID/connection-info")
           PG_PASS=$(echo "$CONN_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin)['password'])")
-          PG_USER="osint_platform_y27c_user"
-          PG_DB="osint_platform_y27c"
-          PG_INT_HOST="dpg-d8nf51nlk1mc739m3g90-a"
-          DATABASE_URL="postgresql+asyncpg://${PG_USER}:${PG_PASS}@${PG_INT_HOST}:5432/${PG_DB}"
-          echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV
+          DATABASE_URL="postgresql+asyncpg://osint_platform_y27c_user:${PG_PASS}@dpg-d8nf51nlk1mc739m3g90-a:5432/osint_platform_y27c"
           
-          echo "=== 2. Set env vars on web service ==="
-          curl -s -w "\nHTTP %{http_code}" -X PATCH -H "$AUTH" -H "$CT" \
-            -d "{\"envVars\":[{\"key\":\"DATABASE_URL\",\"value\":\"${DATABASE_URL}\"},{\"key\":\"FRONTEND_URL\",\"value\":\"https://osint-platform-frontend.onrender.com\"},{\"key\":\"CORS_ORIGINS\",\"value\":\"[\\\"https://osint-platform-frontend.onrender.com\\\",\\\"http://localhost:3000\\\"]\"},{\"key\":\"SECRET_KEY\",\"generateValue\":true}]}" \
+          # Set env vars on web service
+          curl -s -X PATCH -H "$AUTH" -H "$CT" \
+            -d "{\"envVars\":[{\"key\":\"DATABASE_URL\",\"value\":\"${DATABASE_URL}\"},{\"key\":\"FRONTEND_URL\",\"value\":\"https://osint-platform-frontend.onrender.com\"},{\"key\":\"CORS_ORIGINS\",\"value\":\"[\\\"https://osint-platform-frontend.onrender.com\\\"]\"}]}" \
             "$BASE/services/$SVC_ID"
-          echo ""
           
-          echo "=== 3. Set VITE_API_URL on static site ==="
-          curl -s -w "\nHTTP %{http_code}" -X PATCH -H "$AUTH" -H "$CT" \
-            -d '{"envVars":[{"key":"VITE_API_URL","value":"https://osint-platform-w0n6.onrender.com"}]}' \
-            "$BASE/services/$STATIC_ID"
-          echo ""
-          
-          echo "=== 4. Trigger deploy on web service ==="
-          DEPLOY=$(curl -s -w "\nHTTP %{http_code}" -X POST -H "$AUTH" -H "$CT" \
+          # Trigger deploy
+          curl -s -X POST -H "$AUTH" -H "$CT" \
             -d '{"clearCache":"do_not_clear"}' \
-            "$BASE/services/$SVC_ID/deploys")
-          echo "$DEPLOY"
+            "$BASE/services/$SVC_ID/deploys"
