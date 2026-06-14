@@ -11,7 +11,12 @@ jobs:
     steps:
       - name: Sync Render Blueprint
         run: |
-          curl -s -X POST https://api.render.com/v1/blueprints/sync \
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST https://api.render.com/v1/blueprints/sync \
             -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{}'
+            -d '{}')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP $HTTP_CODE"
+          echo "$BODY"
+          exit $([ "$HTTP_CODE" -eq 200 ] && echo 0 || echo 1)
