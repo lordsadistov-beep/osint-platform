@@ -9,32 +9,49 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Setup environment
+      - name: Fix existing service + create PG + static site
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
           CT="Content-Type: application/json"
           BASE="https://api.render.com/v1"
+          SVC_ID="srv-d8mtljrbc2fs73ecqcug"
+          OWNER_ID="tea-d8msahu7r5hc73a5cdmg"
           
-          echo "AUTH=$AUTH" >> $GITHUB_ENV
-          echo "CT=$CT" >> $GITHUB_ENV
-          echo "BASE=$BASE" >> $GITHUB_ENV
-          echo "KEY=$KEY" >> $GITHUB_ENV
-      
-      - name: Get owner and existing services
-        id: info
-        run: |
-          echo "=== Owners ==="
-          OWNERS=$(curl -s -H "$AUTH" "$BASE/owners")
-          echo "$OWNERS"
-          echo "OWNERS=$OWNERS" >> $GITHUB_ENV
+          echo "=== 1. Update existing web service ==="
+          curl -s -w "\nHTTP %{http_code}" -X PATCH -H "$AUTH" -H "$CT" \
+            -d "{\"serviceDetails\":{\"startCommand\":\"cd backend && uvicorn app.main:app --host 0.0.0.0 --port \$PORT\"}}" \
+            "$BASE/services/$SVC_ID"
+          echo ""
           
-          echo "=== Existing services ==="
-          SERVICES=$(curl -s -H "$AUTH" "$BASE/services")
-          echo "$SERVICES"
-          echo "SERVICES=$SERVICES" >> $GITHUB_ENV
+          echo "=== 2. Create PostgreSQL ==="
+          PG_PAYLOAD=$(cat <<'ENDJSON'
+          {
+            "databaseName": "osint_platform",
+            "name": "osint-db",
+            "ownerId": "tea-d8msahu7r5hc73a5cdmg",
+            "plan": "free",
+            "region": "frankfurt",
+            "user": "osint"
+          }
+          ENDJSON
+          )
+          curl -s -w "\nHTTP %{http_code}" -X POST -H "$AUTH" -H "$CT" -d "$PG_PAYLOAD" "$BASE/postgres"
+          echo ""
           
-          echo "=== Existing static sites ==="
-          STATIC=$(curl -s -H "$AUTH" "$BASE/static-sites")
-          echo "$STATIC"
-          echo "STATIC=$STATIC" >> $GITHUB_ENV
+          echo "=== 3. Create static site ==="
+          STATIC_PAYLOAD=$(cat <<'ENDJSON'
+          {
+            "name": "osint-platform-frontend",
+            "ownerId": "tea-d8msahu7r5hc73a5cdmg",
+            "repo": "https://github.com/lordsadistov-beep/osint-platform",
+            "branch": "master",
+            "buildCommand": "npm install && npm run build",
+            "publishPath": "dist",
+            "plan": "free",
+            "region": "frankfurt",
+            "rootDir": "frontend"
+          }
+          ENDJSON
+          )
+          curl -s -w "\nHTTP %{http_code}" -X POST -H "$AUTH" -H "$CT" -d "$STATIC_PAYLOAD" "$BASE/static-sites"
