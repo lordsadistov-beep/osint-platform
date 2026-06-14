@@ -17,16 +17,16 @@ jobs:
           
           echo "=== Failed deploy details ==="
           curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys/dep-d8nfkhhkh4rs73f6au80" | python3 -c "
-import sys, json
-d = json.load(sys.stdin)
-print('Status:', d.get('status'))
-print('Finished:', d.get('finishedAt','N/A'))
-print('Trigger:', d.get('trigger','N/A'))
-bl = d.get('buildLogs')
-if bl:
-    print('--- Build logs (last 2000 chars) ---')
-    print(bl[-2000:])
-else:
-    print('No build logs in response')
-    print('Keys:', list(d.keys()))
-"
+          import sys, json
+          d = json.load(sys.stdin)
+          print('Status:', d.get('status'))
+          print('Finished:', d.get('finishedAt','N/A'))
+          print('Trigger:', d.get('trigger','N/A'))
+          bl = d.get('buildLogs')
+          if bl:
+              print('--- Build logs (last 2000 chars) ---')
+              print(bl[-2000:])
+          else:
+              print('No build logs in response')
+              print('Keys:', list(d.keys()))
+          "
