@@ -8,42 +8,39 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Check latest deploy status
+      - name: Debug deploys response
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
-          CT="Content-Type: application/json"
           BASE="https://api.render.com/v1"
           SVC_ID="srv-d8mtljrbc2fs73ecqcug"
-          PG_ID="dpg-d8nf51nlk1mc739m3g90-a"
-
-          CONN_INFO=$(curl -s -H "$AUTH" "$BASE/postgres/$PG_ID/connection-info")
-          PG_PASS=$(echo "$CONN_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin)['password'])")
-          DATABASE_URL="postgresql+asyncpg://osint_platform_y27c_user:${PG_PASS}@dpg-d8nf51nlk1mc739m3g90-a:5432/osint_platform_y27c"
-
-          curl -s -X PATCH -H "$AUTH" -H "$CT" \
-            -d "{\"envVars\":[{\"key\":\"DATABASE_URL\",\"value\":\"${DATABASE_URL}\"},{\"key\":\"FRONTEND_URL\",\"value\":\"https://osint-platform-frontend.onrender.com\"},{\"key\":\"CORS_ORIGINS\",\"value\":\"[\\\"https://osint-platform-frontend.onrender.com\\\"]\"}]}" \
-            "$BASE/services/$SVC_ID" > /dev/null
-
-          curl -s -X POST -H "$AUTH" -H "$CT" \
-            -d '{"clearCache":"do_not_clear"}' \
-            "$BASE/services/$SVC_ID/deploys" > /dev/null
-
-          echo "Waiting 5 min..."
-          sleep 300
-
-          echo "=== Latest deploy ==="
+          echo "=== Raw deploys response type and keys ==="
           curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys?limit=2" | python3 -c "
           import sys, json
-          raw = json.loads(sys.stdin.read())
-          items = raw if isinstance(raw, list) else raw.get('deploys', [raw])
-          for d in items[:2]:
-              c = d.get('commit',{})
-              print(f\"{d.get('id','?')}: status={d.get('status')} msg='{c.get('message','')[:50]}' finished={d.get('finishedAt','N/A')}\")
+          d = json.loads(sys.stdin.read())
+          print('Type:', type(d).__name__)
+          if isinstance(d, dict):
+              print('Keys:', list(d.keys()))
+              print('First 500 chars:', json.dumps(d, indent=2)[:500])
+          elif isinstance(d, list) and len(d) > 0:
+              print('List length:', len(d))
+              print('First item keys:', list(d[0].keys()))
+              print(json.dumps(d[0], indent=2))
+          else:
+              print('Unexpected format:', repr(d)[:500])
           "
 
-          echo "=== Health ==="
-          curl -s --max-time 10 "https://osint-platform-w0n6.onrender.com/health" || echo "(unreachable)"
           echo ""
-          echo "=== Frontend ==="
-          curl -s --max-time 10 "https://osint-platform-frontend.onrender.com" || echo "(unreachable)"
+          echo "=== Try deploys with cursor=0 ==="
+          curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys?limit=2&cursor=0" | python3 -c "
+          import sys, json
+          d = json.loads(sys.stdin.read())
+          print('Type:', type(d).__name__)
+          if isinstance(d, dict):
+              print('Keys:', list(d.keys()))
+              print(json.dumps(d, indent=2)[:500])
+          elif isinstance(d, list):
+              print('List length:', len(d))
+              for item in d:
+                  print(json.dumps(item, indent=2)[:300])
+          "
