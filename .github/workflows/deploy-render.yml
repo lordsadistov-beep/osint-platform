@@ -8,7 +8,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Connect PG, update env vars, and trigger deploy
+      - name: Trigger deploy and check
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
@@ -25,14 +25,24 @@ jobs:
             -d "{\"envVars\":[{\"key\":\"DATABASE_URL\",\"value\":\"${DATABASE_URL}\"},{\"key\":\"FRONTEND_URL\",\"value\":\"https://osint-platform-frontend.onrender.com\"},{\"key\":\"CORS_ORIGINS\",\"value\":\"[\\\"https://osint-platform-frontend.onrender.com\\\"]\"}]}" \
             "$BASE/services/$SVC_ID"
 
-          curl -s -X POST -H "$AUTH" -H "$CT" \
+          DEPLOY=$(curl -s -X POST -H "$AUTH" -H "$CT" \
             -d '{"clearCache":"do_not_clear"}' \
-            "$BASE/services/$SVC_ID/deploys"
+            "$BASE/services/$SVC_ID/deploys")
+          DEP_ID=$(echo "$DEPLOY" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+          echo "Deploy ID: $DEP_ID"
 
-          echo "=== Waiting 4 min for build+deploy ==="
-          sleep 240
+          echo "Waiting 5 min..."
+          sleep 300
 
-          echo "=== Backend health ==="
+          echo "=== Deploy status ==="
+          curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys/$DEP_ID" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print('Status:', d.get('status'))
+          print('Finished:', d.get('finishedAt','N/A'))
+          "
+
+          echo "=== Backend ==="
           curl -s --max-time 10 "https://osint-platform-w0n6.onrender.com/health" || echo "(unreachable)"
           echo ""
           echo "=== Frontend ==="
