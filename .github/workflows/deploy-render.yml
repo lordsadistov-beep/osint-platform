@@ -25,17 +25,16 @@ jobs:
             -d "{\"envVars\":[{\"key\":\"DATABASE_URL\",\"value\":\"${DATABASE_URL}\"},{\"key\":\"FRONTEND_URL\",\"value\":\"https://osint-platform-frontend.onrender.com\"},{\"key\":\"CORS_ORIGINS\",\"value\":\"[\\\"https://osint-platform-frontend.onrender.com\\\"]\"}]}" \
             "$BASE/services/$SVC_ID"
           
-          DEPLOY_ID=$(curl -s -X POST -H "$AUTH" -H "$CT" \
+          curl -s -X POST -H "$AUTH" -H "$CT" \
             -d '{"clearCache":"do_not_clear"}' \
-            "$BASE/services/$SVC_ID/deploys" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+            "$BASE/services/$SVC_ID/deploys"
           
-          sleep 90
-          
-          echo "=== Deploy status ==="
-          STATUS=$(curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys/$DEPLOY_ID" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
-          echo "Status: $STATUS"
-          
-          echo "=== Backend health ==="
+          echo ""
+          echo "=== Latest deploy status ==="
+          sleep 120
+          curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys?limit=1" | python3 -c "import sys,json; d=json.load(sys.stdin)[0]; print('Status:', d.get('status')); print('Finished:', d.get('finishedAt','N/A'))"
+          echo ""
+          echo "=== Backend ==="
           curl -s --max-time 10 "https://osint-platform-w0n6.onrender.com/health" || echo "(unreachable)"
           echo ""
           echo "=== Frontend ==="
