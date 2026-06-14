@@ -25,12 +25,18 @@ jobs:
             "$BASE/services/$STATIC_ID"
           echo ""
           
+          echo "=== 1.5. Set VITE_API_URL on static site ==="
+          curl -s -w "\nHTTP %{http_code}" -X PATCH -H "$AUTH" -H "$CT" \
+            -d '{"envVars":[{"key":"VITE_API_URL","value":"https://osint-platform-w0n6.onrender.com"}]}' \
+            "$BASE/services/$STATIC_ID"
+          echo ""
+
           echo "=== 2. Wait for PG and set DATABASE_URL ==="
           for i in 1 2 3 4 5; do
             PG_INFO=$(curl -s -H "$AUTH" "$BASE/postgres/$PG_ID")
             STATUS=$(echo "$PG_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))")
             echo "PG status: $STATUS (attempt $i)"
-            if [ "$STATUS" = "active" ]; then
+            if [ "$STATUS" = "available" ]; then
               PG_CONN=$(echo "$PG_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['connectionInfo']['connectionString'])")
               echo "Got PG conn string, setting on web service..."
               curl -s -w " result=%{http_code}" -X PATCH -H "$AUTH" -H "$CT" \
