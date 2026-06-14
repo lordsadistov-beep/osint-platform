@@ -9,17 +9,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Debug Render API auth
+      - name: Sync Render Blueprint
         run: |
-          KEY="${{ secrets.RENDER_API_KEY }}"
-          echo "=== Bearer auth ==="
-          curl -s -w "\nHTTP %{http_code}" -H "Authorization: Bearer $KEY" https://api.render.com/v1/services
-          echo ""
-          echo "=== X-API-Key auth ==="
-          curl -s -w "\nHTTP %{http_code}" -H "X-API-Key: $KEY" https://api.render.com/v1/services
-          echo ""
-          echo "=== Bearer on /v1/blueprints ==="
-          curl -s -w "\nHTTP %{http_code}" -H "Authorization: Bearer $KEY" https://api.render.com/v1/blueprints
-          echo ""
-          echo "=== Bearer on /v1/blueprint-endpoints ==="
-          curl -s -w "\nHTTP %{http_code}" -H "Authorization: Bearer $KEY" https://api.render.com/v1/blueprint-endpoints
+          curl -s -X POST https://api.render.com/v1/blueprints/sync \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}'
