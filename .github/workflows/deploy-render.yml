@@ -16,20 +16,27 @@ jobs:
           CT="Content-Type: application/json"
           BASE="https://api.render.com/v1"
           SVC_ID="srv-d8mtljrbc2fs73ecqcug"
-          STATIC_ID="srv-d8nf52btqb8s73d4cgeg"
           PG_ID="dpg-d8nf51nlk1mc739m3g90-a"
           
-          # Get PG password and build connection string
           CONN_INFO=$(curl -s -H "$AUTH" "$BASE/postgres/$PG_ID/connection-info")
           PG_PASS=$(echo "$CONN_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin)['password'])")
           DATABASE_URL="postgresql+asyncpg://osint_platform_y27c_user:${PG_PASS}@dpg-d8nf51nlk1mc739m3g90-a:5432/osint_platform_y27c"
           
-          # Set env vars on web service
           curl -s -X PATCH -H "$AUTH" -H "$CT" \
             -d "{\"envVars\":[{\"key\":\"DATABASE_URL\",\"value\":\"${DATABASE_URL}\"},{\"key\":\"FRONTEND_URL\",\"value\":\"https://osint-platform-frontend.onrender.com\"},{\"key\":\"CORS_ORIGINS\",\"value\":\"[\\\"https://osint-platform-frontend.onrender.com\\\"]\"}]}" \
             "$BASE/services/$SVC_ID"
-          
-          # Trigger deploy
           curl -s -X POST -H "$AUTH" -H "$CT" \
             -d '{"clearCache":"do_not_clear"}' \
             "$BASE/services/$SVC_ID/deploys"
+
+  health:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Check services
+        run: |
+          echo "=== Backend /health ==="
+          curl -s -w "\nHTTP %{http_code}" --connect-timeout 15 https://osint-platform-w0n6.onrender.com/health || echo "(unreachable)"
+          echo ""
+          echo "=== Frontend ==="
+          curl -s -w "\nHTTP %{http_code}" --connect-timeout 15 https://osint-platform-frontend.onrender.com || echo "(unreachable)"
