@@ -27,13 +27,15 @@ jobs:
           
           curl -s -X POST -H "$AUTH" -H "$CT" \
             -d '{"clearCache":"do_not_clear"}' \
-            "$BASE/services/$SVC_ID/deploys"
+            "$BASE/services/$SVC_ID/deploys" > /tmp/deploy.json
+          cat /tmp/deploy.json | python3 -c "import sys,json; d=json.load(sys.stdin); print('Triggered:', d['id'], d['status'])"
           
-          echo ""
-          echo "=== Latest deploy status ==="
-          sleep 120
-          curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys?limit=1" | python3 -c "import sys,json; d=json.load(sys.stdin)[0]; print('Status:', d.get('status')); print('Finished:', d.get('finishedAt','N/A'))"
-          echo ""
+          echo "Waiting 3 min..."
+          sleep 180
+          
+          echo "=== Check prev deploy (dep-d8nfkhhkh4rs73f6au80) ==="
+          curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys/dep-d8nfkhhkh4rs73f6au80" | python3 -c "import sys,json; d=json.load(sys.stdin); print('Status:', d.get('status','?'))"
+          
           echo "=== Backend ==="
           curl -s --max-time 10 "https://osint-platform-w0n6.onrender.com/health" || echo "(unreachable)"
           echo ""
