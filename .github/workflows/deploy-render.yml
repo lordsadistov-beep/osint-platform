@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Full deploy
+      - name: Fix services and deploy
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
@@ -18,26 +18,31 @@ jobs:
           SVC_ID="srv-d8mtljrbc2fs73ecqcug"
           STATIC_ID="srv-d8nf52btqb8s73d4cgeg"
           PG_ID="dpg-d8nf51nlk1mc739m3g90-a"
-          OID="tea-d8msahu7r5hc73a5cdmg"
           
-          echo "=== 1. Get PG connection info ==="
-          PG_INFO=$(curl -s -H "$AUTH" "$BASE/postgres/$PG_ID")
-          echo "$PG_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print('connStr:', d.get('connectionInfo',{}).get('connectionString','N/A'))"
-          
-          echo "=== 2. Set DATABASE_URL env var on web service ==="
-          PG_CONN=$(echo "$PG_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['connectionInfo']['connectionString'])")
+          echo "=== 1. Fix static site config ==="
           curl -s -w "\nHTTP %{http_code}" -X PATCH -H "$AUTH" -H "$CT" \
-            -d "{\"envVars\":[{\"key\":\"DATABASE_URL\",\"value\":\"${PG_CONN}\"}]}" \
-            "$BASE/services/$SVC_ID"
-          echo ""
-          
-          echo "=== 3. Fix static site config ==="
-          curl -s -w "\nHTTP %{http_code}" -X PATCH -H "$AUTH" -H "$CT" \
-            -d "{\"serviceDetails\":{\"buildCommand\":\"npm install && npm run build\",\"publishPath\":\"dist\"}}" \
+            -d '{"serviceDetails":{"buildCommand":"npm install && npm run build","publishPath":"dist"}}' \
             "$BASE/services/$STATIC_ID"
           echo ""
           
-          echo "=== 4. Trigger deploy on web service ==="
+          echo "=== 2. Wait for PG and set DATABASE_URL ==="
+          for i in 1 2 3 4 5; do
+            PG_INFO=$(curl -s -H "$AUTH" "$BASE/postgres/$PG_ID")
+            STATUS=$(echo "$PG_INFO" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))")
+            echo "PG status: $STATUS (attempt $i)"
+            if [ "$STATUS" = "active" ]; then
+              PG_CONN=$(echo "$PG_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['connectionInfo']['connectionString'])")
+              echo "Got PG conn string, setting on web service..."
+              curl -s -w " result=%{http_code}" -X PATCH -H "$AUTH" -H "$CT" \
+                -d "{\"envVars\":[{\"key\":\"DATABASE_URL\",\"value\":\"${PG_CONN}\"}]}" \
+                "$BASE/services/$SVC_ID"
+              break
+            fi
+            sleep 10
+          done
+          echo ""
+          
+          echo "=== 3. Trigger deploy on web service ==="
           curl -s -w "\nHTTP %{http_code}" -X POST -H "$AUTH" -H "$CT" \
-            -d "{\"clearCache\":\"do_not_clear\"}" \
+            -d '{"clearCache":"do_not_clear"}' \
             "$BASE/services/$SVC_ID/deploys"
