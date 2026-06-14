@@ -3,13 +3,12 @@ name: Deploy to Render
 on:
   push:
     branches: [master]
-  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Connect PG and trigger deploy
+      - name: Connect PG and deploy
         run: |
           KEY="${{ secrets.RENDER_API_KEY }}"
           AUTH="Authorization: Bearer $KEY"
@@ -25,37 +24,19 @@ jobs:
           curl -s -X PATCH -H "$AUTH" -H "$CT" \
             -d "{\"envVars\":[{\"key\":\"DATABASE_URL\",\"value\":\"${DATABASE_URL}\"},{\"key\":\"FRONTEND_URL\",\"value\":\"https://osint-platform-frontend.onrender.com\"},{\"key\":\"CORS_ORIGINS\",\"value\":\"[\\\"https://osint-platform-frontend.onrender.com\\\"]\"}]}" \
             "$BASE/services/$SVC_ID"
-          curl -s -X POST -H "$AUTH" -H "$CT" \
+          
+          DEPLOY_ID=$(curl -s -X POST -H "$AUTH" -H "$CT" \
             -d '{"clearCache":"do_not_clear"}' \
-            "$BASE/services/$SVC_ID/deploys"
-
-  status:
-    runs-on: ubuntu-latest
-    needs: deploy
-    steps:
-      - name: Check deploy result
-        run: |
-          KEY="${{ secrets.RENDER_API_KEY }}"
-          AUTH="Authorization: Bearer $KEY"
-          SVC_ID="srv-d8mtljrbc2fs73ecqcug"
-          echo "=== Last deploy status ==="
-          DEPLOY=$(curl -s --max-time 30 -H "$AUTH" "https://api.render.com/v1/services/$SVC_ID/deploys?limit=1")
-          echo "$DEPLOY" | python3 -c "
-import sys, json
-d = json.load(sys.stdin)
-dep = d[0]
-print('Status:', dep.get('status'))
-if dep.get('status') == 'live':
-    print('SUCCESS - service is live')
-elif dep.get('status') == 'build_failed':
-    print('FAILED - build error')
-    print('Logs:', dep.get('buildLogs','N/A'))
-else:
-    print('State:', dep.get('status'))
-"
-          echo ""
-          echo "=== Backend /health ==="
-          curl -s --max-time 15 -w "\nHTTP %{http_code}" "https://osint-platform-w0n6.onrender.com/health" || echo "(unreachable)"
+            "$BASE/services/$SVC_ID/deploys" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+          
+          sleep 90
+          
+          echo "=== Deploy status ==="
+          STATUS=$(curl -s -H "$AUTH" "$BASE/services/$SVC_ID/deploys/$DEPLOY_ID" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
+          echo "Status: $STATUS"
+          
+          echo "=== Backend health ==="
+          curl -s --max-time 10 "https://osint-platform-w0n6.onrender.com/health" || echo "(unreachable)"
           echo ""
           echo "=== Frontend ==="
-          curl -s --max-time 15 -w "\nHTTP %{http_code}" "https://osint-platform-frontend.onrender.com" || echo "(unreachable)"
+          curl -s --max-time 10 "https://osint-platform-frontend.onrender.com" || echo "(unreachable)"
